@@ -106,8 +106,8 @@ if button:
     netG.load_state_dict(model_data)
     netG.eval()
     preprocess = transforms.Compose([
-        transforms.Resize(500),
-        #transforms.CenterCrop(224),
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
         transforms.ToTensor(),
     ])
     img_t = preprocess(image)
