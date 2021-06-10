@@ -24,12 +24,7 @@ if uploaded_file is not None:
         use_column_width=True
     )
 
-#############################################
-
-button = st.button('Change!')
-
-if button:
-    class ResNetBlock(nn.Module): # <1>
+class ResNetBlock(nn.Module): # <1>
     
     def __init__(self, dim):
         super(ResNetBlock, self).__init__()
@@ -100,6 +95,13 @@ class ResNetGenerator(nn.Module):
 
     def forward(self, input): # <3>
         return self.model(input)
+    
+#############################################
+
+button = st.button('Change!')
+
+if button:
+    
     netG = ResNetGenerator()
     model_path = './horse2zebra_0.4.0.pth'
     model_data = torch.load(model_path)
