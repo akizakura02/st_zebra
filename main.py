@@ -30,7 +30,7 @@ button = st.button('Change!')
 
 if button:
     class ResNetBlock(nn.Module): # <1>
-
+    
     def __init__(self, dim):
         super(ResNetBlock, self).__init__()
         self.conv_block = self.build_conv_block(dim)
