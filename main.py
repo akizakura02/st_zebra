@@ -12,11 +12,12 @@ import io
 image = Image()
 
 st.title('馬からシマウマへ')
+image = Image.open('zebra.png')
 
 uploaded_file = st.file_uploader('Choose a image file')
 
 if uploaded_file is not None:
-    global image = Image.open(uploaded_file)
+    image = Image.open(uploaded_file)
     img_array = np.array(image)
     st.image(
         image, caption='upload images',
