@@ -10,7 +10,7 @@ from torchvision import transforms
 import io 
 
 st.title('馬からシマウマへ')
-image = Image.open('./zebra.png')
+#image = Image.open('./zebra.png')
 
 uploaded_file = st.file_uploader('Choose a image file')
 
