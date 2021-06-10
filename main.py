@@ -9,8 +9,6 @@ import torch.nn as nn
 from torchvision import transforms
 import io 
 
-image = Image()
-
 st.title('馬からシマウマへ')
 image = Image.open('zebra.png')
 
