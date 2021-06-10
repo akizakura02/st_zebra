@@ -4,3 +4,5 @@ pandas
 Image
 lightgdm
 sklearn
+torch
+torchvision
