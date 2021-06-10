@@ -4,120 +4,112 @@ import pandas as pd
 from PIL import Image
 import time
 
-import lightgbm as lgb
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import StratifiedKFold
+import torch
+import torch.nn as nn
+from torchvision import transforms
+import io 
 
-st.title('タイタニック号 生存予測')
-img = Image.open('titanic_ticket.jpg')
-st.image(img, use_column_width=True)
+image = Image()
 
-#########################################
-#年齢
-age = st.number_input('年齢', 0, 100, 20)
+st.title('馬からシマウマへ')
 
-#性別
-sex_male = 0
-sex_female = 0
-gender = st.selectbox(
-    '性別',
-    ('男', '女'))
-if gender == '男':
-    sex_male = 1
-    sex_female = 0
-else:
-    sex_male = 0
-    sex_female = 1
+uploaded_file = st.file_uploader('Choose a image file')
 
-#配偶者
-sibsp = 0
-partner = st.selectbox(
-    '配偶者の有無',
-    ('なし', 'あり'))
-if partner =='あり':
-    sibsp = 1
-else:
-    sibsp = 0
+if uploaded_file is not None:
+    global image = Image.open(uploaded_file)
+    img_array = np.array(image)
+    st.image(
+        image, caption='upload images',
+        use_column_width=True
+    )
 
-#子供
-parch = 0
-child = st.selectbox(
-    '子供の有無',
-    ('なし', 'あり'))
-if child =='あり':
-    parch = 1
-else:
-    parch = 0
+#############################################
 
-#客室等級
-pclass = 3
-pclass_st = st.selectbox(
-    '客室等級',
-    ('1', '2', '3'))
-if pclass_st =='1':
-    pclass = 1
-elif pclass_st =='2':
-    pclass = 2
-else:
-    pclass = 3
-
-#DataFrame作成
-test_dict = {
-    "Pclass":pclass,
-    "Age":age,
-    "SibSp":sibsp,
-    "Parch":parch,
-    "Sex_female":sex_female,
-    "Sex_male":sex_male
-}
-test = pd.DataFrame(test_dict, index=['0'])
-# テストデータの予測を格納する、418行5列のnumpy行列を作成
-test_pred = np.zeros((len(test), 5))
-###########################################
-
-button = st.button('Predict')
+button = st.button('Change!')
 
 if button:
-    train = pd.read_csv('../input/titanic/train.csv')
-    sample_submission = pd.read_csv('../input/titanic/gender_submission.csv')
-    # SexとEmbarkedのOne-Hotエンコーディング
-    train = pd.get_dummies(train, columns=['Sex'])
-    # 不要な列の削除
-    train.drop(['PassengerId', 'Name', 'Cabin', 'Ticket', 'Fare', 'Embarked'], axis=1, inplace=True)
-    X_train = train.drop(['Survived'], axis=1)  # X_trainはtrainのSurvived列以外
-    y_train = train['Survived']  # Y_trainはtrainのSurvived列
-    # 5分割交差検証を指定し、インスタンス化
-    from sklearn.model_selection import StratifiedKFold
-    kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
-    # スコアとモデルを格納するリスト
-    score_list = []
-    models = []
-    for fold_, (train_index, valid_index) in enumerate(kf.split(X_train, y_train)):    
-        print(f'fold{fold_ + 1} start')
-        train_x = X_train.iloc[train_index]
-        valid_x = X_train.iloc[valid_index]
-        train_y = y_train[train_index]
-        valid_y = y_train[valid_index]
-    
-        # lab.Datasetを使って、trainとvalidを作っておく
-        lgb_train= lgb.Dataset(train_x, train_y)
-        lgb_valid = lgb.Dataset(valid_x, valid_y)
-        # パラメータを定義
-        lgbm_params = {'objective': 'binary'}
+    class ResNetBlock(nn.Module): # <1>
 
-        # lgb.trainで学習
-        gbm = lgb.train(params=lgbm_params,
-                        train_set=lgb_train,
-                        valid_sets=[lgb_train, lgb_valid],
-                        early_stopping_rounds=20,
-                        verbose_eval=-1
-                        )
-        oof = (gbm.predict(valid_x) > 0.5).astype(int)
-        score_list.append(round(accuracy_score(valid_y, oof)*100,2))
-        models.append(gbm)  # 学習が終わったモデルをリストに入れておく
+    def __init__(self, dim):
+        super(ResNetBlock, self).__init__()
+        self.conv_block = self.build_conv_block(dim)
 
-    for fold_, gbm in enumerate(models):
-        test_pred[:, fold_] = gbm.predict(test) # testを予測
-        pred = np.mean(test_pred, axis=1) * 100
-    st.title('あなたの生存確率は ' + str(round(pred[0],2)) + '%です!')
-    st.write('※予想モデルの正答率は76.32%')
+    def build_conv_block(self, dim):
+        conv_block = []
+
+        conv_block += [nn.ReflectionPad2d(1)]
+
+        conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=0, bias=True),
+                       nn.InstanceNorm2d(dim),
+                       nn.ReLU(True)]
+
+        conv_block += [nn.ReflectionPad2d(1)]
+
+        conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=0, bias=True),
+                       nn.InstanceNorm2d(dim)]
+
+        return nn.Sequential(*conv_block)
+
+    def forward(self, x):
+        out = x + self.conv_block(x) # <2>
+        return out
+        
+class ResNetGenerator(nn.Module):
+
+    def __init__(self, input_nc=3, output_nc=3, ngf=64, n_blocks=9): # <3> 
+
+        assert(n_blocks >= 0)
+        super(ResNetGenerator, self).__init__()
+
+        self.input_nc = input_nc
+        self.output_nc = output_nc
+        self.ngf = ngf
+
+        model = [nn.ReflectionPad2d(3),
+                 nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=True),
+                 nn.InstanceNorm2d(ngf),
+                 nn.ReLU(True)]
+
+        n_downsampling = 2
+        for i in range(n_downsampling):
+            mult = 2**i
+            model += [nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3,
+                                stride=2, padding=1, bias=True),
+                      nn.InstanceNorm2d(ngf * mult * 2),
+                      nn.ReLU(True)]
+
+        mult = 2**n_downsampling
+        for i in range(n_blocks):
+            model += [ResNetBlock(ngf * mult)]
+
+        for i in range(n_downsampling):
+            mult = 2**(n_downsampling - i)
+            model += [nn.ConvTranspose2d(ngf * mult, int(ngf * mult / 2),
+                                         kernel_size=3, stride=2,
+                                         padding=1, output_padding=1,
+                                         bias=True),
+                      nn.InstanceNorm2d(int(ngf * mult / 2)),
+                      nn.ReLU(True)]
+
+        model += [nn.ReflectionPad2d(3)]
+        model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
+        model += [nn.Tanh()]
+
+        self.model = nn.Sequential(*model)
+
+    def forward(self, input): # <3>
+        return self.model(input)
+    netG = ResNetGenerator()
+    model_path = './horse2zebra_0.4.0.pth'
+    model_data = torch.load(model_path)
+    netG.load_state_dict(model_data)
+    netG.eval()
+    preprocess = transforms.Compose([
+                                 transforms.ToTensor(),
+    ])
+    img_t = preprocess(image)
+    batch_t = torch.unsqueeze(img_t, 0)
+    batch_out = netG(batch_t)
+    out_t = (batch_out.data.squeeze() + 1.0) / 2.0
+    out_img = transforms.ToPILImage()(out_t)
+    st.image(out_img, use_column_width=True)
