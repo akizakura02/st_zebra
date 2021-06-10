@@ -10,7 +10,7 @@ from torchvision import transforms
 import io 
 
 st.title('馬からシマウマへ')
-image = Image.open('zebra.png')
+image = Image.open('./zebra.png')
 
 uploaded_file = st.file_uploader('Choose a image file')
 
@@ -106,7 +106,9 @@ if button:
     netG.load_state_dict(model_data)
     netG.eval()
     preprocess = transforms.Compose([
-                                 transforms.ToTensor(),
+        transforms.Resize(500),
+        #transforms.CenterCrop(224),
+        transforms.ToTensor(),
     ])
     img_t = preprocess(image)
     batch_t = torch.unsqueeze(img_t, 0)
